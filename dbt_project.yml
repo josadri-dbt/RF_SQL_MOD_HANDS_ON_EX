@@ -38,5 +38,7 @@ clean-targets:         # directories to be removed by `dbt clean`
 models:
   dbt_rf_mod_hands_on_ex:
     # Applies to all files under models/example/
-    example:
-      +materialized: table
+    legacy: 
+        +materialized: table
+    marts:
+        +materialized: table
