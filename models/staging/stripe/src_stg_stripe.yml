@@ -22,7 +22,7 @@ sources:
           - name: paymentmethod
             description: es el método de pago
           - name: status
-            description: es el estatus del pago
+            description: es el estado del pago
           - name: amount
             description: es el monto del pago
           - name: created
