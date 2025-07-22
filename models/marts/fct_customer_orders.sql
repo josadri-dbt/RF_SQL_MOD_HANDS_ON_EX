@@ -1,23 +1,5 @@
-
--- sources --
-
-with
-
-base_customers as (
-    select * 
-    from {{ source('jaffle_shop', 'customers') }}  -- referencia correcta a la tabla de clientes
-),
-
-base_orders as (
-    select * 
-    from {{ source('jaffle_shop', 'orders') }}  -- referencia correcta a la tabla de órdenes
-),
-
-base_payments as (
-    select * from {{ source('stripe', 'payments') }}  -- referencia correcta a la tabla de pagos
-),
-
 -- staging --
+with 
 
 orders as (
 
@@ -27,7 +9,7 @@ orders as (
         order_date as order_placed_at,
         status as order_status
     from
-        base_orders
+        {{ref('stg_orders')}}
 
 ),
 
@@ -37,15 +19,8 @@ customers as (
         first_name as customer_first_name,
         last_name as customer_last_name
     from
-        base_customers
+        {{ref('stg_customers')}}
 ),
-
-stg_payments as (
-    select * from base_payments
-),
-
-
--- intermediate --
 
 payments as (
     select 
@@ -54,37 +29,21 @@ payments as (
         max(created) as payment_finalized_date,
         sum(amount) / 100.0 as total_amount_paid
 
-    from stg_payments  
+    from {{ref('stg_payments')}}  
     
     where status <> 'fail'
     
     group by orderid
 ),
 
-paid_orders as (
-    select 
-        orders.order_id,
-        orders.customer_id,
-        orders.order_placed_at,
-        orders.order_status,
-        payments.total_amount_paid,
-        payments.payment_finalized_date,
-        customers.customer_first_name,
-        customers.customer_last_name
-
-    from orders
-
-    left join payments 
-        on orders.order_id = payments.order_id
-
-    left join customers 
-        on orders.customer_id = customers.customer_id
-),
+-- intermediate --
 
 customer_orders as (
     select 
         customers.customer_id,
-        min(orders.order_placed_at) as first_order_date,
+        customers.customer_first_name,
+        customers.customer_last_name,
+        min(orders.order_placed_at) as fdos,
         max(orders.order_placed_at) as most_recent_order_date,
         count(orders.order_id) as number_of_orders
 
@@ -94,13 +53,51 @@ customer_orders as (
         on orders.customer_id = customers.customer_id
 
     group by 
-        customers.customer_id
-)
+        customers.customer_id, customer_first_name, customer_last_name
+),
 
-select
-        p.customer_id,
+paid_orders AS (
+    SELECT 
+        orders.order_id,
+        orders.customer_id,
+        orders.order_placed_at,
+        orders.order_status,
+        payments.total_amount_paid,
+        payments.payment_finalized_date,
+        customers.customer_first_name,
+        customers.customer_last_name,
+        customers.fdos,  -- Aseguramos que 'fdos' está en la tabla customers
+
+        -- Secuencia de transacciones
+        ROW_NUMBER() OVER (ORDER BY orders.order_id) AS transaction_seq,
+
+        -- Secuencia de ventas por cliente
+        ROW_NUMBER() OVER (
+            PARTITION BY orders.customer_id 
+            ORDER BY orders.order_id
+        ) AS customer_sales_seq,
+
+        -- Clasificación de pedido como 'new' o 'return'
+        CASE 
+            WHEN customers.fdos = orders.order_placed_at THEN 'new' 
+            ELSE 'return' 
+        END AS nvsr
+
+    FROM 
+        orders
+
+    LEFT JOIN payments 
+        ON orders.order_id = payments.order_id
+
+    LEFT JOIN customers 
+        ON orders.customer_id = customers.customer_id
+),
+
+total_amount_order_customer as (
+
+    select 
         p.order_id,
-        sum(t2.total_amount_paid) as clv_bad
+        sum(t2.total_amount_paid) as customer_lifetime_value
     from 
         paid_orders p
     left join 
@@ -108,8 +105,14 @@ select
         on p.customer_id = t2.customer_id 
         and p.order_id >= t2.order_id
     group by 
-        p.customer_id, p.order_id
-    order by p.customer_id, p.order_id
+        p.order_id
+    order by
+        p.order_id
+
+)
+
+
+
 
 
     
