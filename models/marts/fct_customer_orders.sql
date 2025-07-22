@@ -1,60 +1,116 @@
-WITH customers AS (
-    SELECT * 
-    FROM {{ source('jaffle_shop', 'customers') }}  -- Referencia correcta a la tabla de clientes
+
+-- sources --
+
+with
+
+base_customers as (
+    select * 
+    from {{ source('jaffle_shop', 'customers') }}  -- referencia correcta a la tabla de clientes
 ),
 
-orders AS (
-    SELECT * 
-    FROM {{ source('jaffle_shop', 'orders') }}  -- Referencia correcta a la tabla de órdenes
+base_orders as (
+    select * 
+    from {{ source('jaffle_shop', 'orders') }}  -- referencia correcta a la tabla de órdenes
 ),
 
-payments AS (
-    SELECT ORDERID AS order_id,
-           MAX(CREATED) AS payment_finalized_date,
-           SUM(AMOUNT) / 100.0 AS total_amount_paid
-    FROM {{ source('stripe', 'payments') }}  -- Correcta referencia a la tabla de pagos
-    WHERE STATUS <> 'fail'
-    GROUP BY ORDERID
+base_payments as (
+    select * from {{ source('stripe', 'payments') }}  -- referencia correcta a la tabla de pagos
 ),
 
-paid_orders AS (
-    SELECT orders.ID AS order_id,
-           orders.USER_ID AS customer_id,
-           orders.ORDER_DATE AS order_placed_at,
-           orders.STATUS AS order_status,
-           p.total_amount_paid,
-           p.payment_finalized_date,
-           customers.FIRST_NAME AS customer_first_name,
-           customers.LAST_NAME AS customer_last_name
-    FROM orders  -- Referencia correcta a la tabla de órdenes
-    LEFT JOIN payments p ON orders.ID = p.order_id  -- Corregido el LEFT JOIN
-    LEFT JOIN customers ON orders.USER_ID = customers.ID
+-- staging --
+
+orders as (
+
+    select
+        id as order_id,
+        user_id as customer_id,
+        order_date as order_placed_at,
+        status as order_status
+    from
+        base_orders
+
 ),
 
-customer_orders AS (
-    SELECT customers.ID AS customer_id,
-           MIN(orders.ORDER_DATE) AS first_order_date,
-           MAX(orders.ORDER_DATE) AS most_recent_order_date,
-           COUNT(orders.ID) AS number_of_orders
-    FROM customers  -- Referencia correcta a la tabla de clientes
-    LEFT JOIN orders ON orders.USER_ID = customers.ID  -- Corregido el JOIN
-    GROUP BY customers.ID  -- Especificando correctamente la agrupación por 'customers.ID'
+customers as (
+    select
+        id as customer_id,
+        first_name as customer_first_name,
+        last_name as customer_last_name
+    from
+        base_customers
+),
+
+stg_payments as (
+    select * from base_payments
+),
+
+
+-- intermediate --
+
+payments as (
+    select 
+        orderid as order_id,
+
+        max(created) as payment_finalized_date,
+        sum(amount) / 100.0 as total_amount_paid
+
+    from stg_payments  
+    
+    where status <> 'fail'
+    
+    group by orderid
+),
+
+paid_orders as (
+    select 
+        orders.order_id,
+        orders.customer_id,
+        orders.order_placed_at,
+        orders.order_status,
+        payments.total_amount_paid,
+        payments.payment_finalized_date,
+        customers.customer_first_name,
+        customers.customer_last_name
+
+    from orders
+
+    left join payments 
+        on orders.order_id = payments.order_id
+
+    left join customers 
+        on orders.customer_id = customers.customer_id
+),
+
+customer_orders as (
+    select 
+        customers.customer_id,
+        min(orders.order_placed_at) as first_order_date,
+        max(orders.order_placed_at) as most_recent_order_date,
+        count(orders.order_id) as number_of_orders
+
+    from customers
+
+    left join orders 
+        on orders.customer_id = customers.customer_id
+
+    group by 
+        customers.customer_id
 )
 
-SELECT
-    p.*,
-    ROW_NUMBER() OVER (ORDER BY p.order_id) AS transaction_seq,
-    ROW_NUMBER() OVER (PARTITION BY p.customer_id ORDER BY p.order_id) AS customer_sales_seq,
-    CASE WHEN c.first_order_date = p.order_placed_at THEN 'new' ELSE 'return' END AS nvsr,
-    x.clv_bad AS customer_lifetime_value,
-    c.first_order_date AS fdos
-FROM paid_orders p
-LEFT JOIN customer_orders c ON p.customer_id = c.customer_id  -- Aseguramos que el JOIN se hace correctamente
-LEFT OUTER JOIN (
-    SELECT p.order_id,
-           SUM(t2.total_amount_paid) AS clv_bad
-    FROM paid_orders p
-    LEFT JOIN paid_orders t2 ON p.customer_id = t2.customer_id AND p.order_id >= t2.order_id
-    GROUP BY p.order_id
-) x ON x.order_id = p.order_id
-ORDER BY p.order_id
+select
+        p.customer_id,
+        p.order_id,
+        sum(t2.total_amount_paid) as clv_bad
+    from 
+        paid_orders p
+    left join 
+        paid_orders t2 
+        on p.customer_id = t2.customer_id 
+        and p.order_id >= t2.order_id
+    group by 
+        p.customer_id, p.order_id
+    order by p.customer_id, p.order_id
+
+
+    
+

@@ -1,0 +1,29 @@
+version: 2
+
+sources:
+  - name: stripe
+    database: dbt-fundamentals-463313
+    schema: stripe
+    tables:
+      - name: payments
+        description: one record per payment
+        freshness: 
+          error_after:
+            count: 2671
+            period: day
+          warn_after:
+            count: 2661
+            period: day
+        columns:
+          - name: id
+            description: primary key
+          - name: orderid
+            description: es el id de la orden
+          - name: paymentmethod
+            description: es el método de pago
+          - name: status
+            description: es el estatus del pago
+          - name: amount
+            description: es el monto del pago
+          - name: created
+            description: fecha en la que se creó el registro
