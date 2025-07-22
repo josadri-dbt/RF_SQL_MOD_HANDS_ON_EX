@@ -4,10 +4,7 @@ with
 orders as (
 
     select
-        id as order_id,
-        user_id as customer_id,
-        order_date as order_placed_at,
-        status as order_status
+        *
     from
         {{ref('stg_orders')}}
 
@@ -15,25 +12,16 @@ orders as (
 
 customers as (
     select
-        id as customer_id,
-        first_name as customer_first_name,
-        last_name as customer_last_name
+        *
     from
         {{ref('stg_customers')}}
 ),
 
 payments as (
     select 
-        orderid as order_id,
-
-        max(created) as payment_finalized_date,
-        sum(amount) / 100.0 as total_amount_paid
-
-    from {{ref('stg_payments')}}  
-    
-    where status <> 'fail'
-    
-    group by orderid
+        *
+    from 
+        {{ref('stg_payments')}}  
 ),
 
 -- intermediate --
@@ -62,11 +50,13 @@ paid_orders AS (
         orders.customer_id,
         orders.order_placed_at,
         orders.order_status,
-        payments.total_amount_paid,
-        payments.payment_finalized_date,
         customers.customer_first_name,
         customers.customer_last_name,
         customers.fdos,  -- Aseguramos que 'fdos' está en la tabla customers
+
+        max(payments.created) over (partition by orders.order_id) as payment_finalized_date,
+
+        sum(payments.payment_amount/100) over (partition by orders.order_id) as total_amount_paid,
 
         -- Secuencia de transacciones
         ROW_NUMBER() OVER (ORDER BY orders.order_id) AS transaction_seq,
@@ -89,11 +79,13 @@ paid_orders AS (
     LEFT JOIN payments 
         ON orders.order_id = payments.order_id
 
-    LEFT JOIN customers 
+    LEFT JOIN customer_orders as customers 
         ON orders.customer_id = customers.customer_id
+    
+    WHERE payments.payment_status <> 'fail'
 ),
 
-total_amount_order_customer as (
+total_acc_amount_order_customer as (
 
     select 
         p.order_id,
@@ -111,8 +103,43 @@ total_amount_order_customer as (
 
 )
 
+-- final --
 
+SELECT
+    p.*,  -- Seleccionamos todas las columnas de la tabla 'paid_orders'
 
+    -- Secuencia general de transacciones
+    p.transaction_seq,
+
+    -- Secuencia de ventas por cliente
+    p.customer_sales_seq,
+
+    -- Clasificación del pedido como 'new' o 'return'
+    p.nvsr,
+
+    -- Valor de vida del cliente acumulado hasta este pedido
+    x.customer_lifetime_value,
+
+    -- Fecha del primer pedido del cliente
+    c.fdos
+
+FROM 
+    paid_orders p
+
+LEFT JOIN 
+    customer_orders c 
+    ON p.customer_id = c.customer_id
+
+LEFT OUTER JOIN 
+    total_acc_amount_order_customer x 
+    ON x.order_id = p.order_id
+
+ORDER BY 
+    p.order_id
+
+-- final --
+
+select * from customer_paid_orders order by customer_id
 
 
     
