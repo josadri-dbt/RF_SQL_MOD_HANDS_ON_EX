@@ -1,0 +1,40 @@
+version: 2
+
+models:
+  - name: stg_customers
+    description: modelo de la capa de staging que tiene como fuente los customers
+    columns:
+      - name: customer_id
+        description: primary key
+        tests:
+          - unique
+          - not_null
+      - name: customer_firts_name
+        description: Nombre propio del cliente
+        tests:
+          - not_null
+      - name: customer_last_name
+        description: Apellidos del cliente
+        tests:
+          - not_null
+  - name: stg_orders
+    description: modelo de la capa de staging que tiene como fuente las orders
+    columns:
+      - name: order_id
+        description: primary key
+        tests:
+          - unique
+          - not_null
+      - name: customer_id
+        description: Es el id del cliente que realizó esta orden
+        tests:
+          - relationships:
+              to: ref('stg_customers')
+              field: customer_id
+      - name: order_placed_at
+        description: Es la fecha en la que se realizó la orden
+      - name: order_status
+        description: "{{ doc('order_status') }}"
+        tests:
+          - accepted_values:
+              values: ['returned','completed','return_pending','shipped','placed']
