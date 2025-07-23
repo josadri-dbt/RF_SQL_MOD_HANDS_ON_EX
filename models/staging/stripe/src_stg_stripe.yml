@@ -7,22 +7,32 @@ sources:
     tables:
       - name: payments
         description: one record per payment
-        freshness: 
+        config:
+          freshness: 
           error_after:
             count: 2671
             period: day
           warn_after:
             count: 2661
-            period: day
+            period: day 
         columns:
           - name: id
+            tests:
+              - unique
+              - not_null
             description: primary key
           - name: orderid
             description: es el id de la orden
           - name: paymentmethod
-            description: es el método de pago
+            description: "{{ doc('payment_method') }}"
+            tests:
+              - accepted_values:
+                  values: ['credit_card','coupon',bank_transfer','gift_card']
           - name: status
-            description: es el estado del pago
+            description: "{{ doc('payment_status') }}"
+            tests:
+              - accepted_values:
+                  values: ['success','fail']
           - name: amount
             description: es el monto del pago
           - name: created
