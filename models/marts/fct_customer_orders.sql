@@ -9,15 +9,6 @@ paid_orders AS (
         {{ref("paid_orders_int")}}
 ),
 
-total_acc_amount_order_customer as (
-
-    select
-        *
-    from
-        {{ref("total_acc_amount_order_customer_int")}}
-
-)
-
 -- final --
 
 SELECT
@@ -33,17 +24,13 @@ SELECT
     p.nvsr,
 
     -- Valor de vida del cliente acumulado hasta este pedido
-    x.customer_lifetime_value,
+    p.customer_lifetime_value,
 
     -- Fecha del primer pedido del cliente
     p.fdos
 
 FROM 
     paid_orders p
-
-LEFT OUTER JOIN 
-    total_acc_amount_order_customer x 
-    ON x.order_id = p.order_id
 
 ORDER BY 
     p.order_id

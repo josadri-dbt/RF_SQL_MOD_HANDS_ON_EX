@@ -56,14 +56,16 @@ models:
         description: Es una secuencia que enumera las órdenes a nivel de cliente
       - name: nvsr
         description: Determina si una orden es nueva o no en base a una cuestión -> "fdos" = "order_placed_at"
-  - name: total_acc_amount_order_customer_int
-    description: Es un modelo que acumula montos de pago a nivel de órdenes y clientes
+  - name: payments_int
+    description: Es un modelo a nivel de órdenes que agrega campos de los pagos
     columns:
       - name: order_id
         description: primary key
         tests:
           - unique
           - not_null
-      - name: customer_lifetime_value
-        description: Es el monto de pago acumulado por orden a nivel de cliente
+      - name: payment_finalized_date
+        description: Es la última fecha de pago de la orden
+      - name: total_amount_paid
+        description: Es el monto total de los pagos pagados en esa orden dividos entre cien
   
