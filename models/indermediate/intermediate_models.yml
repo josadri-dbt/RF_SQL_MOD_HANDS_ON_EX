@@ -19,7 +19,7 @@ models:
         description: Es la fecha de la orden más reciente que el cliente realizó
       - name: number_of_orders
         description: Es el número total de órdenes realizadas por el cliente
-  - name: paid_orders
+  - name: paid_orders_int
     description: Modelo con datos de órdenes (nivel de órdenes), de clientes ,con resúemnes de pagos y lógica sobre clientes y órdenes
     columns:
       - name: order_id
@@ -56,7 +56,7 @@ models:
         description: Es una secuencia que enumera las órdenes a nivel de cliente
       - name: nvsr
         description: Determina si una orden es nueva o no en base a una cuestión -> "fdos" = "order_placed_at"
-  - name: total_acc_amount_order_customer
+  - name: total_acc_amount_order_customer_int
     description: Es un modelo que acumula montos de pago a nivel de órdenes y clientes
     columns:
       - name: order_id
