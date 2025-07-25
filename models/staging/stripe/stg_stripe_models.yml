@@ -1,0 +1,30 @@
+version: 2
+
+models:
+  - name: stg_payments
+    description: modelo de la capa de staging de la fuente de payments
+    columns:
+      - name: payment_id
+        description: primary key
+        tests:
+          - unique
+          - not_null
+      - name: order_id
+        description: es el id de la orden
+        tests:
+          - relationships:
+              to: ref('stg_orders')
+              field: order_id
+      - name: payment_method
+        description: "{{ doc('payment_method') }}"
+        tests:
+          - accepted_values:
+              values: ['credit_card','coupon',bank_transfer','gift_card']
+      - name: payment_status
+        description: "{{ doc('payment_status') }}"
+        tests:
+          - accepted_values:
+              values: ['success','fail']
+      - name: created
+        description: fecha en la que se creó el registro
+      
