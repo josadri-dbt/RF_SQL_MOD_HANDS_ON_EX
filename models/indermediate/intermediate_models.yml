@@ -1,0 +1,69 @@
+version: 2
+
+models:
+  - name: customer_orders_int
+    description: Modelo con datos de cliente y resúmenes de datos de órdenes
+    columns:
+      - name: customer_id
+        description: primary key
+        tests:
+          - unique
+          - not_null
+      - name: customer_firts_name
+        description: Es el nombre propio del cliente
+      - name: customer_last_name
+        description: Es el apellido del cliente
+      - name: fdos
+        description: Es la fecha de la primera orden que el cliente realizó
+      - name: most_recent_order_date
+        description: Es la fecha de la orden más reciente que el cliente realizó
+      - name: number_of_orders
+        description: Es el número total de órdenes realizadas por el cliente
+  - name: paid_orders
+    description: Modelo con datos de órdenes (nivel de órdenes), de clientes ,con resúemnes de pagos y lógica sobre clientes y órdenes
+    columns:
+      - name: order_id
+        description: primary key
+        tests:
+          - unique
+          - not_null
+      - name: customer_id
+        description: Es el id del cliente
+        tests:
+          - relationships:
+              to: ref('customer_orders_int')
+              field: customer_id
+      - name: order_placed_at
+        description: Es la fecha en la que se realizó la orden
+      - name: order_status
+        description: "{{ doc('order_status_int') }}"
+        tests:
+          - accepted_values:
+              values: ['returned','completed','return_pending','shipped','placed']
+      - name: customer_first_name
+        description: Es el nombre propio del cliente
+      - name: customer_last_name
+        description: Es el apellido del cliente
+      - name: fdos
+        description: Es la fecha de la primera orden que el cliente realizó
+      - name: payment_finalized_date
+        description: Es la última fecha de pago de la orden
+      - name: total_amount_paid
+        description: Es el monto total de los pagos pagados en esa orden
+      - name: transaction_seq
+        description: Es una secuencia que enumera las órdenes
+      - name: customer_sales_seq
+        description: Es una secuencia que enumera las órdenes a nivel de cliente
+      - name: nvsr
+        description: Determina si una orden es nueva o no en base a una cuestión -> "fdos" = "order_placed_at"
+  - name: total_acc_amount_order_customer
+    description: Es un modelo que acumula montos de pago a nivel de órdenes y clientes
+    columns:
+      - name: order_id
+        description: primary key
+        tests:
+          - unique
+          - not_null
+      - name: customer_lifetime_value
+        description: Es el monto de pago acumulado por orden a nivel de cliente
+  
